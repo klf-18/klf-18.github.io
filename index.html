@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05030a">
+<title>星光圣诞树</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05030a;color:#ffe9f3;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+body{touch-action:manipulation}canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#shade{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:radial-gradient(ellipse at 50% 48%,rgba(75,20,53,.22),transparent 58%);transition:opacity 1s}
+h1{font-weight:300;letter-spacing:.24em;font-size:clamp(23px,7vw,34px);margin:0;text-shadow:0 0 18px #ff72b5}
+p{font-size:13px;letter-spacing:.18em;color:#d9a9c4;margin:0 0 8px}
+button{border:1px solid rgba(255,180,216,.65);background:rgba(255,120,180,.10);color:#ffe5f1;border-radius:30px;padding:12px 26px;letter-spacing:.18em;font-size:13px;backdrop-filter:blur(8px)}
+#caption{position:fixed;bottom:max(8vh,44px);left:0;right:0;text-align:center;opacity:0;transition:opacity 2s;pointer-events:none;text-shadow:0 0 12px #ff6db1,0 0 28px #ff4c9a}
+#caption strong{display:block;font-size:clamp(18px,5vw,25px);font-weight:300;letter-spacing:.25em}
+#caption span{display:block;margin-top:10px;font-size:11px;letter-spacing:.22em;color:#dbaac4}
+#hint{position:fixed;bottom:22px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.2em;color:rgba(255,210,230,.42)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="shade"><h1>星光圣诞树</h1><p>一场为你准备的粉色星光</p><button id="start">开启星光 ✦</button></div>
+<div id="caption"><strong>愿你被温柔与星光围绕</strong><span>MERRY CHRISTMAS · WITH LOVE</span></div>
+<div id="hint">轻触屏幕 · 星光会再次绽放</div>
+<script>
+(()=>{
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let w,h,dpr,particles=[],sparkles=[],started=false,burst=0,t=0;
+const rand=(a,b)=>a+Math.random()*(b-a);
+function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);makeTree()}
+addEventListener('resize',resize);
+function makeTree(){
+ particles=[];
+ const cx=w/2, top=h*.24, base=Math.min(h*.72,w*1.15), height=base-top;
+ // A delicate helical ribbon made from many glowing points.
+ for(let i=0;i<1250;i++){
+  const u=i/1249, y=top+u*height, radius=(u*.42+.025)*Math.min(w*.43,170);
+  const a=u*Math.PI*19;
+  particles.push({x:cx+Math.cos(a)*radius,y:y+Math.sin(a)*2.5,z:Math.sin(a),phase:rand(0,6.28),size:rand(.45,1.55),alpha:rand(.35,.9)});
+ }
+ // faint inner constellation dots
+ for(let i=0;i<320;i++){
+  const u=rand(.04,.98), a=rand(0,Math.PI*2), r=u*Math.min(w*.36,145);
+  const maxR=(u*.42+.025)*Math.min(w*.43,170);
+  sparkles.push({x:cx+Math.cos(a)*Math.min(r,maxR),y:top+u*height+rand(-5,5),phase:rand(0,6.28),size:rand(.3,1.1)});
+ }
+}
+function glow(x,y,r,a,color='#ff83bd'){
+ const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(255,235,247,${a})`);g.addColorStop(.22,`rgba(255,119,184,${a*.72})`);g.addColorStop(1,'rgba(255,80,160,0)');
+ ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+}
+function star(x,y,outer,inner,rot=0){
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();
+ for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?inner:outer;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}
+ ctx.closePath();ctx.fillStyle='#fff1f8';ctx.shadowColor='#ff75b9';ctx.shadowBlur=22;ctx.fill();ctx.restore();
+}
+function firework(){
+ const x=w/2+rand(-w*.24,w*.24),y=h*.28+rand(-h*.12,h*.12);
+ for(let i=0;i<95;i++){let a=rand(0,Math.PI*2),v=rand(.5,3.4);burstParticles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(35,75),max:75})}
+}
+let burstParticles=[];
+function draw(){
+ requestAnimationFrame(draw);t++;
+ ctx.fillStyle='rgba(5,3,10,.23)';ctx.fillRect(0,0,w,h);
+ const cx=w/2, top=h*.24;
+ // distant dust
+ for(let i=0;i<26;i++){let x=(i*97+t*.12)%w,y=(i*173)%h;glow(x,y,rand(2,5),.13)}
+ // tree particles
+ for(const p of particles){
+  const tw=.55+.45*Math.sin(t*.045+p.phase);
+  const sway=Math.sin(t*.009+p.phase)*1.6;
+  glow(p.x+sway,p.y,5+p.size*3,p.alpha*tw*.42);
+  ctx.fillStyle=`rgba(255,${150+Math.floor(tw*75)},${205+Math.floor(tw*40)},${p.alpha*tw})`;
+  ctx.beginPath();ctx.arc(p.x+sway,p.y,p.size,0,Math.PI*2);ctx.fill();
+ }
+ for(const p of sparkles){let a=.2+.55*(.5+.5*Math.sin(t*.035+p.phase));ctx.fillStyle=`rgba(255,205,230,${a})`;ctx.fillRect(p.x,p.y,p.size,p.size)}
+ // trunk glow and star
+ glow(cx,h*.24,34,.5);star(cx,top-12,13,5,t*.006);
+ // little orbiting lights
+ for(let j=0;j<3;j++){let a=t*.012+j*2.1,r=26+j*12;glow(cx+Math.cos(a)*r,top-10+Math.sin(a)*r*.25,5,.65)}
+ // fireworks
+ if(started&&t%155===0)firework();
+ burstParticles=burstParticles.filter(p=>p.life-->0);
+ for(const p of burstParticles){p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.vy*=.985;let a=p.life/p.max;glow(p.x,p.y,7,a*.65);ctx.fillStyle=`rgba(255,220,239,${a})`;ctx.fillRect(p.x,p.y,2,2)}
+}
+resize();draw();
+const shade=document.getElementById('shade'),caption=document.getElementById('caption');
+function start(){if(!started){started=true;shade.style.opacity='0';setTimeout(()=>shade.style.display='none',1000);caption.style.opacity='1';for(let i=0;i<3;i++)setTimeout(firework,i*450)}else firework()}
+document.getElementById('start').addEventListener('click',start);
+canvas.addEventListener('pointerdown',()=>{if(started)firework()});
+})();
+</script>
+</body>
+</html>
