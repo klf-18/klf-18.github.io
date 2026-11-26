@@ -16,6 +16,7 @@ button{border:1px solid rgba(255,180,216,.65);background:rgba(255,120,180,.10);c
 #caption strong{display:block;font-size:clamp(18px,5vw,25px);font-weight:300;letter-spacing:.25em}
 #caption span{display:block;margin-top:10px;font-size:11px;letter-spacing:.22em;color:#dbaac4}
 #hint{position:fixed;bottom:22px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.2em;color:rgba(255,210,230,.42)}
+#musicBtn{position:fixed;top:max(18px,env(safe-area-inset-top));right:16px;z-index:5;display:none;border:1px solid rgba(255,180,216,.55);background:rgba(30,10,28,.72);color:#ffe5f1;border-radius:24px;padding:9px 13px;font-size:12px;letter-spacing:.08em;backdrop-filter:blur(8px)}
 </style>
 </head>
 <body>
@@ -23,71 +24,70 @@ button{border:1px solid rgba(255,180,216,.65);background:rgba(255,120,180,.10);c
 <div id="shade"><h1>星光圣诞树</h1><p>一场为你准备的粉色星光</p><button id="start">开启星光 ✦</button></div>
 <div id="caption"><strong>愿你被温柔与星光围绕</strong><span>MERRY CHRISTMAS · WITH LOVE</span></div>
 <div id="hint">轻触屏幕 · 星光会再次绽放</div>
+<button id="musicBtn" type="button">♫ 音乐：暂停</button>
 <script>
 (()=>{
 const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-let w,h,dpr,particles=[],sparkles=[],started=false,burst=0,t=0;
+let w,h,dpr,particles=[],sparkles=[],started=false,t=0;
 const rand=(a,b)=>a+Math.random()*(b-a);
+let audioCtx=null,musicTimer=null,musicOn=false,noteIndex=0;
+// Original gentle, bell-like Christmas melody composed for this page.
+const melody=[659.25,783.99,880,783.99,659.25,587.33,523.25,587.33,659.25,783.99,987.77,880,783.99,659.25,587.33,523.25,587.33,659.25,783.99,659.25,587.33,523.25,493.88,523.25];
+function bell(freq,when,duration,volume){
+ const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+ osc.type='sine';osc.frequency.setValueAtTime(freq,when);
+ gain.gain.setValueAtTime(.0001,when);gain.gain.exponentialRampToValueAtTime(volume,when+.025);gain.gain.exponentialRampToValueAtTime(.0001,when+duration);
+ osc.connect(gain);gain.connect(audioCtx.destination);osc.start(when);osc.stop(when+duration+.03);
+}
+function playStep(){
+ if(!musicOn||!audioCtx)return;
+ const now=audioCtx.currentTime,f=melody[noteIndex%melody.length];
+ bell(f,now,.48,.10);bell(f*2,now+.015,.28,.025);
+ if(noteIndex%4===0)[261.63,329.63,392].forEach(v=>bell(v,now+.02,.9,.018));
+ noteIndex++;musicTimer=setTimeout(playStep,430);
+}
+function startMusic(){
+ if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=new AC()}
+ audioCtx.resume();musicOn=true;document.getElementById('musicBtn').textContent='♫ 音乐：暂停';
+ clearTimeout(musicTimer);playStep();
+}
+function toggleMusic(){
+ if(!audioCtx){startMusic();return}
+ if(musicOn){musicOn=false;clearTimeout(musicTimer);audioCtx.suspend();document.getElementById('musicBtn').textContent='♫ 音乐：继续'}
+ else startMusic();
+}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);makeTree()}
 addEventListener('resize',resize);
 function makeTree(){
- particles=[];
- const cx=w/2, top=h*.24, base=Math.min(h*.72,w*1.15), height=base-top;
- // A delicate helical ribbon made from many glowing points.
- for(let i=0;i<1250;i++){
-  const u=i/1249, y=top+u*height, radius=(u*.42+.025)*Math.min(w*.43,170);
-  const a=u*Math.PI*19;
-  particles.push({x:cx+Math.cos(a)*radius,y:y+Math.sin(a)*2.5,z:Math.sin(a),phase:rand(0,6.28),size:rand(.45,1.55),alpha:rand(.35,.9)});
- }
- // faint inner constellation dots
- for(let i=0;i<320;i++){
-  const u=rand(.04,.98), a=rand(0,Math.PI*2), r=u*Math.min(w*.36,145);
-  const maxR=(u*.42+.025)*Math.min(w*.43,170);
-  sparkles.push({x:cx+Math.cos(a)*Math.min(r,maxR),y:top+u*height+rand(-5,5),phase:rand(0,6.28),size:rand(.3,1.1)});
- }
+ particles=[];sparkles=[];
+ const cx=w/2,top=h*.24,base=Math.min(h*.72,w*1.15),height=base-top;
+ for(let i=0;i<1250;i++){const u=i/1249,y=top+u*height,radius=(u*.42+.025)*Math.min(w*.43,170),a=u*Math.PI*19;particles.push({x:cx+Math.cos(a)*radius,y:y+Math.sin(a)*2.5,phase:rand(0,6.28),size:rand(.45,1.55),alpha:rand(.35,.9)})}
+ for(let i=0;i<320;i++){const u=rand(.04,.98),a=rand(0,Math.PI*2),r=u*Math.min(w*.36,145),maxR=(u*.42+.025)*Math.min(w*.43,170);sparkles.push({x:cx+Math.cos(a)*Math.min(r,maxR),y:top+u*height+rand(-5,5),phase:rand(0,6.28),size:rand(.3,1.1)})}
 }
-function glow(x,y,r,a,color='#ff83bd'){
+function glow(x,y,r,a){
  const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(255,235,247,${a})`);g.addColorStop(.22,`rgba(255,119,184,${a*.72})`);g.addColorStop(1,'rgba(255,80,160,0)');
  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
 }
-function star(x,y,outer,inner,rot=0){
- ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();
- for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?inner:outer;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}
- ctx.closePath();ctx.fillStyle='#fff1f8';ctx.shadowColor='#ff75b9';ctx.shadowBlur=22;ctx.fill();ctx.restore();
-}
-function firework(){
- const x=w/2+rand(-w*.24,w*.24),y=h*.28+rand(-h*.12,h*.12);
- for(let i=0;i<95;i++){let a=rand(0,Math.PI*2),v=rand(.5,3.4);burstParticles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(35,75),max:75})}
-}
+function star(x,y,outer,inner,rot=0){ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?inner:outer;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fillStyle='#fff1f8';ctx.shadowColor='#ff75b9';ctx.shadowBlur=22;ctx.fill();ctx.restore()}
 let burstParticles=[];
+function firework(){const x=w/2+rand(-w*.24,w*.24),y=h*.28+rand(-h*.12,h*.12);for(let i=0;i<95;i++){let a=rand(0,Math.PI*2),v=rand(.5,3.4);burstParticles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:rand(35,75),max:75})}}
 function draw(){
- requestAnimationFrame(draw);t++;
- ctx.fillStyle='rgba(5,3,10,.23)';ctx.fillRect(0,0,w,h);
- const cx=w/2, top=h*.24;
- // distant dust
- for(let i=0;i<26;i++){let x=(i*97+t*.12)%w,y=(i*173)%h;glow(x,y,rand(2,5),.13)}
- // tree particles
- for(const p of particles){
-  const tw=.55+.45*Math.sin(t*.045+p.phase);
-  const sway=Math.sin(t*.009+p.phase)*1.6;
-  glow(p.x+sway,p.y,5+p.size*3,p.alpha*tw*.42);
-  ctx.fillStyle=`rgba(255,${150+Math.floor(tw*75)},${205+Math.floor(tw*40)},${p.alpha*tw})`;
-  ctx.beginPath();ctx.arc(p.x+sway,p.y,p.size,0,Math.PI*2);ctx.fill();
- }
+ requestAnimationFrame(draw);t++;ctx.fillStyle='rgba(5,3,10,.23)';ctx.fillRect(0,0,w,h);
+ const cx=w/2,top=h*.24;
+ for(let i=0;i<26;i++){let x=(i*97+t*.12)%w,y=(i*173)%h;glow(x,y,4,.13)}
+ for(const p of particles){const tw=.55+.45*Math.sin(t*.045+p.phase),sway=Math.sin(t*.009+p.phase)*1.6;glow(p.x+sway,p.y,5+p.size*3,p.alpha*tw*.42);ctx.fillStyle=`rgba(255,${150+Math.floor(tw*75)},${205+Math.floor(tw*40)},${p.alpha*tw})`;ctx.beginPath();ctx.arc(p.x+sway,p.y,p.size,0,Math.PI*2);ctx.fill()}
  for(const p of sparkles){let a=.2+.55*(.5+.5*Math.sin(t*.035+p.phase));ctx.fillStyle=`rgba(255,205,230,${a})`;ctx.fillRect(p.x,p.y,p.size,p.size)}
- // trunk glow and star
  glow(cx,h*.24,34,.5);star(cx,top-12,13,5,t*.006);
- // little orbiting lights
  for(let j=0;j<3;j++){let a=t*.012+j*2.1,r=26+j*12;glow(cx+Math.cos(a)*r,top-10+Math.sin(a)*r*.25,5,.65)}
- // fireworks
  if(started&&t%155===0)firework();
  burstParticles=burstParticles.filter(p=>p.life-->0);
  for(const p of burstParticles){p.x+=p.vx;p.y+=p.vy;p.vx*=.985;p.vy*=.985;let a=p.life/p.max;glow(p.x,p.y,7,a*.65);ctx.fillStyle=`rgba(255,220,239,${a})`;ctx.fillRect(p.x,p.y,2,2)}
 }
 resize();draw();
 const shade=document.getElementById('shade'),caption=document.getElementById('caption');
-function start(){if(!started){started=true;shade.style.opacity='0';setTimeout(()=>shade.style.display='none',1000);caption.style.opacity='1';for(let i=0;i<3;i++)setTimeout(firework,i*450)}else firework()}
+function start(){if(!started){started=true;shade.style.opacity='0';setTimeout(()=>shade.style.display='none',1000);caption.style.opacity='1';document.getElementById('musicBtn').style.display='block';startMusic();for(let i=0;i<3;i++)setTimeout(firework,i*450)}else firework()}
 document.getElementById('start').addEventListener('click',start);
+document.getElementById('musicBtn').addEventListener('click',e=>{e.stopPropagation();toggleMusic()});
 canvas.addEventListener('pointerdown',()=>{if(started)firework()});
 })();
 </script>
